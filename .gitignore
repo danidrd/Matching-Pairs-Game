@@ -1,6 +1,6 @@
 # Default ignored files
 /shelf/
-/workspace.xml
+/.idea/workspace.xml
 # Editor-based HTTP Client requests
 /httpRequests/
 # Datasource local storage ignored files
@@ -32,3 +32,10 @@ Thumbs.db
 
 # Other build artifacts
 /build/
+
+# Generated files
+*.class
+*.jar
+
+#.idea folder
+/.idea/*
