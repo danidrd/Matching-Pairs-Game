@@ -1,10 +1,10 @@
 package io.github.danidrd.matchingpairs.view;
 
+import io.github.danidrd.matchingpairs.controller.GameController;
+
 import javax.swing.*;
 import java.awt.*;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
+import java.beans.*;
 
 /**
  * Each card in the game will be a JButton that can be flipped to reveal its value.
@@ -13,23 +13,41 @@ import java.beans.PropertyChangeSupport;
 public class CardView extends JButton {
     private int value;
     private CardState state;
+    private GameController controller; // Reference to the game controller
 
     // Final property change support used to notify listeners
     private PropertyChangeSupport pcs;
+    private VetoableChangeSupport vcs;
 
     /**
      * CardView Constructor
-     * Initializes the CardView calling super()
+     * Initializes the CardView calling super(),
+     * initialize the controller reference,
+     * for handling responsiveness of cards,
      * sets the state of the card to FACE_DOWN
      * Add an action listener to flip the card
      */
-    public CardView() {
+    public CardView(GameController controller) {
         super();
+        this.controller = controller; // Initialize the controller reference
         setState(CardState.FACE_DOWN);
         setFont(new Font("Arial", Font.BOLD, 24));
         addActionListener(e -> flipCard());
     }
 
+    /**
+     * Sets the game controller for this card.
+     *
+     * <p>This method assigns the provided {@link GameController} instance
+     * to this card, allowing it to interact with the game logic.
+     * It is typically used when initializing or reconfiguring the card
+     * within the game.
+     *
+     * @param controller the game controller to be associated with this card
+     */
+    public void setController(GameController controller) {
+        this.controller = controller;
+    }
     /**
      * @return the value of the card
      */
@@ -55,19 +73,35 @@ public class CardView extends JButton {
         return state;
     }
 
+
     /**
-     * Sets the state of this card.
+     * Sets the state of the card and updates its appearance.
      *
-     * <p>Whenever the state of this card is changed, its appearance is updated and
-     * a {@link PropertyChangeEvent} is fired to all registered listeners.
+     * <p>This method changes the card's state to the specified new state,
+     * updates its appearance accordingly, and fires a property change event
+     * to notify listeners of the state change. If the controller is active
+     * and the new state is FACE_UP, the state change is ignored to prevent
+     * interaction during active timing.
      *
-     * @param newState the new state of this card
+     * @param newState the new state to be set for the card
      */
     public void setState(CardState newState) {
-        CardState oldState = this.state;
-        this.state = newState;
-        updateAppearance();
-        getPropertyChangeSupport().firePropertyChange("state", oldState, newState);
+        if(controller != null && controller.isTimerActive() && newState == CardState.FACE_UP)
+            return;
+
+        try {
+
+            getVetoableChangeSupport().fireVetoableChange("state", this.state, newState);
+
+            CardState oldState = this.state;
+            this.state = newState;
+            updateAppearance();
+            getPropertyChangeSupport().firePropertyChange("state", oldState, newState);
+
+        } catch (PropertyVetoException e) {
+            System.out.println("State change vetoed: " + e.getMessage());
+        }
+
     }
 
     /**
@@ -101,6 +135,7 @@ public class CardView extends JButton {
             case FACE_UP:
                 setBackground(Color.WHITE);
                 setText(String.valueOf(value));
+                setEnabled(false);
                 break;
             case EXCLUDED:
                 setBackground(Color.RED);
@@ -110,7 +145,27 @@ public class CardView extends JButton {
         }
     }
 
+    /**
+     * Adds a listener to the list of listeners that are notified when
+     * this card's state is about to change. The listener is given the
+     * opportunity to veto the change by throwing a
+     * {@link PropertyVetoException}.
+     *
+     * @param listener the listener to be added
+     */
+    public void addVetoableChangeListener(VetoableChangeListener listener) {
+        getVetoableChangeSupport().addVetoableChangeListener(listener);
+    }
 
+    /**
+     * Removes a listener from the list of listeners that are notified when
+     * this card's state changes.
+     *
+     * @param listener the listener to be removed
+     */
+    public void removeVetoableChangeListener(VetoableChangeListener listener) {
+        getVetoableChangeSupport().removeVetoableChangeListener(listener);
+    }
     /**
      * Registers a listener to receive property change events from this
      * {@link CardView}.
@@ -131,10 +186,38 @@ public class CardView extends JButton {
         getPropertyChangeSupport().removePropertyChangeListener(listener);
     }
 
+    /**
+     * Returns the {@link PropertyChangeSupport} object responsible for
+     * managing listeners for bound property changes on this
+     * {@link CardView}.
+     *
+     * <p>This method lazily initializes the
+     * {@link PropertyChangeSupport} instance if it has not been
+     * initialized yet.
+     *
+     * @return the property change support
+     */
     private PropertyChangeSupport getPropertyChangeSupport(){
         if(pcs == null){
             pcs = new PropertyChangeSupport(this);
         }
         return pcs;
+    }
+
+    /**
+     * Provides access to the vetoable change support for this card.
+     *
+     * <p>This method initializes the {@link VetoableChangeSupport} instance
+     * if it is not already initialized and returns it. The vetoable change
+     * support is used to manage listeners that can veto changes to bound
+     * properties of this card.
+     *
+     * @return the vetoable change support associated with this card
+     */
+    private VetoableChangeSupport getVetoableChangeSupport(){
+        if(vcs == null){
+            vcs = new VetoableChangeSupport(this);
+        }
+        return vcs;
     }
 }

@@ -4,8 +4,11 @@ import io.github.danidrd.matchingpairs.view.BoardView;
 import io.github.danidrd.matchingpairs.view.CardView;
 import io.github.danidrd.matchingpairs.view.CardState;
 
+import javax.smartcardio.Card;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
+import java.beans.PropertyVetoException;
+import java.beans.VetoableChangeListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.awt.event.ActionListener;
@@ -21,21 +24,63 @@ import java.util.Collections;
  *     <li> Track matched pairs and total flips. </li>
  * </ul>
  */
-public class GameController implements ActionListener, PropertyChangeListener {
-    private final BoardView boardView;
-    private final List<CardView> cards;
-
+public class GameController implements ActionListener, PropertyChangeListener, VetoableChangeListener {
+    private  List<CardView> cards = new ArrayList<>();
+    private BoardView boardView;
     private int matchedPairs = 0;
     private int totalFlips = 0;
     private CardView firstSelectedCard = null;
+    private boolean isTimerActive = false; // Flag to track timer activity
+    private boolean bypassVeto = false;
 
-    public GameController(BoardView boardView) {
-        this.boardView = boardView;
+    // Empty Constructor
+    public GameController() {}
+
+/**
+ * Handles vetoable changes to card state.
+ *
+ * <p>This method is triggered when a card's state property is about to change.
+ * It checks if the transition from EXCLUDED or FACE_UP to FACE_DOWN is attempted,
+ * and vetoes such state changes by throwing a {@link PropertyVetoException}.
+ *
+ * @param evt the vetoable change event containing the details of the state change
+ * @throws PropertyVetoException if the state change is not allowed
+ */
+    @Override
+    public void vetoableChange(PropertyChangeEvent evt) throws PropertyVetoException {
+        if ( "state".equals(( evt.getPropertyName()))) {
+            if(bypassVeto) {
+                return; // Skip veto logic during shuffle or other bypass operations
+            }
+            CardView card = (CardView) evt.getSource();
+            CardState oldState = (CardState) evt.getOldValue();
+            CardState newState = (CardState) evt.getNewValue();
+
+            // Disallow state changes from excluded or face_up to face_down
+            if( (oldState == CardState.EXCLUDED || oldState == CardState.FACE_UP) && newState == CardState.FACE_DOWN) {
+                throw new PropertyVetoException("State transition not allowed", evt);
+            }
+        }
+    }
+
+
+    /**
+     * Initializes the game controller.
+     *
+     * <p>This method is typically called right after the game controller is created.
+     * It sets the board view, assigns listeners to all cards, the shuffle button,
+     * and the exit button. It also shuffles the cards to start the game.
+     *
+     * @param boardView the board view to be associated with this game controller
+     */
+    public void initialize(BoardView boardView) {
+        setBoardView(boardView);
         this.cards = boardView.getCards();
 
         // Assign listeners
         for ( CardView card : cards ) {
             card.addPropertyChangeListener(this);
+            card.addVetoableChangeListener(this);
             card.addActionListener(this);
         }
 
@@ -44,6 +89,15 @@ public class GameController implements ActionListener, PropertyChangeListener {
 
         // Initialize game
         shuffleCards();
+    }
+
+    /**
+     * @return true if a timer is currently active, false otherwise.
+     * <p>
+     * The timer is used to delay the flipping back of unmatched cards.
+     */
+    public boolean isTimerActive() {
+        return isTimerActive;
     }
 
     /**
@@ -59,7 +113,17 @@ public class GameController implements ActionListener, PropertyChangeListener {
         if ( e.getSource() == boardView.getShuffleButton() ) {
             shuffleCards();
         }else if ( e.getSource() == boardView.getExitButton() ) {
-            System.exit(0);
+            // Display confirmation dialog
+            int choice = JOptionPane.showConfirmDialog(
+                    boardView,
+                    "Are you sure you want to exit?",
+                    "Confirm Exit",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE // Icon type (e.g. Warning)
+            );
+            if (choice == JOptionPane.YES_NO_OPTION) {
+                System.exit(0);
+            }
         }
     }
 
@@ -98,6 +162,9 @@ public class GameController implements ActionListener, PropertyChangeListener {
      * @param card the card that was flipped
      */
     private void handleCardFlip(CardView card) {
+        if(isTimerActive || card.getState() != CardState.FACE_UP)
+            return; // Ignore if timer is active or card is not flipped
+
         if ( card.getState() == CardState.FACE_UP ) {
             totalFlips++;
             boardView.getTotalFlipsLabel().setText("Total Flips: " + totalFlips);
@@ -118,10 +185,15 @@ public class GameController implements ActionListener, PropertyChangeListener {
                     }
                 } else {
                     // No match, flip back after a short delay
-                    Timer timer = new Timer(500, evt -> {
+
+                    isTimerActive = true; // Timer starts, disable further interactions
+                    Timer timer = new Timer(1000, evt -> {
+                        setBypassVeto(true);
                         firstSelectedCard.setState(CardState.FACE_DOWN);
                         card.setState(CardState.FACE_DOWN);
+                        setBypassVeto(false);
                         firstSelectedCard = null;
+                        isTimerActive = false; // Timer ends, re-enable interactions
                     });
                     timer.setRepeats(false);
                     timer.start();
@@ -153,12 +225,30 @@ public class GameController implements ActionListener, PropertyChangeListener {
         // Shuffle values
         Collections.shuffle(values);
 
+        // Temporarily bypass veto logic
+        setBypassVeto(true);
+
         // Assign shuffled values to cards and reset state
         for( int i = 0; i < cards.size(); i++ ) {
             CardView card = cards.get(i);
             card.setValue(values.get(i));
             card.setState(CardState.FACE_DOWN);
         }
+
+        setBypassVeto(false); // Re-enable veto logic
+        firstSelectedCard = null; // Reset firstSelectedCard
+        isTimerActive = false;  // Ensure the timer is not active
     }
 
+    public void setBoardView(BoardView boardView) {
+        this.boardView = boardView;
+    }
+
+    public boolean isBypassVeto() {
+        return bypassVeto;
+    }
+
+    public void setBypassVeto(boolean bypassVeto) {
+        this.bypassVeto = bypassVeto;
+    }
 }

@@ -17,8 +17,9 @@ public class MatchingPairsGame {
      */
     public static void main(String[] args){
         SwingUtilities.invokeLater(() -> {
-            BoardView boardView = new BoardView(16); // Example with 16 cards
-            new GameController(boardView);
+            GameController controller = new GameController(); // Create controller
+            BoardView boardView = new BoardView(controller, 16); // Example with 16 cards
+            controller.initialize(boardView);
         });
     }
 }

@@ -1,5 +1,7 @@
 package io.github.danidrd.matchingpairs.view;
 
+import io.github.danidrd.matchingpairs.controller.GameController;
+
 import javax.swing.*;
 import java.awt.GridLayout;
 import java.awt.BorderLayout;
@@ -20,29 +22,32 @@ public class BoardView extends JFrame {
 
     /**
      * BoardView constructor
-     * Initializes BoardView calling the JFrame constructor
-     * sets the size of the window
-     * sets the layout of the window
-     * sets close operation
-     * Initializes all cards and adds them to the cards panel
-     * thus, adds the cards panel to the window
+     * Initializes BoardView calling the JFrame constructor,
+     * sets the size of the window,
+     * sets the layout of the window,
+     * sets close operation.
+     * Initializes all cards passing the controller and adds them to the cards panel
+     * thus, adds the cards panel to the window.
      * Create a control panel with the shuffle button and the exit button
-     * and adds it to the window
+     * and adds it to the window.
      * Create info panel with the matched pairs label and the total flips label
-     * and adds it to the window
+     * and adds it to the window.
      * Finally, sets the window visible
-     * @param numberOfCards
+     * @param numberOfCards number of the cards of the game
      */
-    public BoardView(int numberOfCards){
+    public BoardView(GameController controller, int numberOfCards){
         super("Matching Pair Game");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLayout(new BorderLayout());
 
+        int rows = (int) Math.sqrt(numberOfCards);
+        int cols = (int) Math.ceil((double) numberOfCards / rows);
+
         // Initialize cards
-        JPanel cardsPanel = new JPanel(new GridLayout(4, numberOfCards / 4, 10, 10)); // Adjust the number of rows as needed
+        JPanel cardsPanel = new JPanel(new GridLayout(rows, cols, 10, 10)); // Adjust the number of rows as needed
         for(int i = 0; i < numberOfCards; i++) {
-            CardView card = new CardView();
+            CardView card = new CardView(controller); // Pass controller to CardView
             cards.add(card);
             cardsPanel.add(card);
         }
