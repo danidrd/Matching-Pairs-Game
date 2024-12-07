@@ -4,7 +4,7 @@ import io.github.danidrd.matchingpairs.view.BoardView;
 import io.github.danidrd.matchingpairs.view.CardView;
 import io.github.danidrd.matchingpairs.view.CardState;
 
-import javax.smartcardio.Card;
+
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.beans.PropertyVetoException;
