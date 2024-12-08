@@ -16,10 +16,14 @@ public class MatchingPairsGame {
      * @param args the command line arguments
      */
     public static void main(String[] args){
+
         SwingUtilities.invokeLater(() -> {
             GameController controller = new GameController(); // Create controller
-            BoardView boardView = new BoardView(controller, 16); // Example with 16 cards
+            BoardView boardView = new BoardView(controller); // Example with 16 cards
             controller.initialize(boardView);
+
+
         });
     }
+
 }

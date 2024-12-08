@@ -13,7 +13,6 @@ import java.beans.*;
 public class CardView extends JButton {
     private int value;
     private CardState state;
-    private GameController controller; // Reference to the game controller
 
     // Final property change support used to notify listeners
     private PropertyChangeSupport pcs;
@@ -27,27 +26,13 @@ public class CardView extends JButton {
      * sets the state of the card to FACE_DOWN
      * Add an action listener to flip the card
      */
-    public CardView(GameController controller) {
+    public CardView() {
         super();
-        this.controller = controller; // Initialize the controller reference
         setState(CardState.FACE_DOWN);
         setFont(new Font("Arial", Font.BOLD, 24));
         addActionListener(e -> flipCard());
     }
 
-    /**
-     * Sets the game controller for this card.
-     *
-     * <p>This method assigns the provided {@link GameController} instance
-     * to this card, allowing it to interact with the game logic.
-     * It is typically used when initializing or reconfiguring the card
-     * within the game.
-     *
-     * @param controller the game controller to be associated with this card
-     */
-    public void setController(GameController controller) {
-        this.controller = controller;
-    }
     /**
      * @return the value of the card
      */
@@ -86,8 +71,6 @@ public class CardView extends JButton {
      * @param newState the new state to be set for the card
      */
     public void setState(CardState newState) {
-        if(controller != null && controller.isTimerActive() && newState == CardState.FACE_UP)
-            return;
 
         try {
 
@@ -97,7 +80,7 @@ public class CardView extends JButton {
             this.state = newState;
             updateAppearance();
             getPropertyChangeSupport().firePropertyChange("state", oldState, newState);
-
+            System.out.println("Card" + this + " state changing to: " + newState);
         } catch (PropertyVetoException e) {
             System.out.println("State change vetoed: " + e.getMessage());
         }
@@ -128,14 +111,13 @@ public class CardView extends JButton {
     private void updateAppearance(){
         switch (state) {
             case FACE_DOWN:
-                setBackground(Color.LIGHT_GRAY);
+                setBackground(Color.GREEN);
                 setText("");
                 setEnabled(true);
                 break;
             case FACE_UP:
                 setBackground(Color.WHITE);
                 setText(String.valueOf(value));
-                setEnabled(false);
                 break;
             case EXCLUDED:
                 setBackground(Color.RED);
