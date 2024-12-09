@@ -3,19 +3,18 @@ package io.github.danidrd.matchingpairs.controller;
 import io.github.danidrd.matchingpairs.view.BoardView;
 import io.github.danidrd.matchingpairs.view.CardView;
 import io.github.danidrd.matchingpairs.view.CardState;
+import io.github.danidrd.matchingpairs.view.LeaderboardEntry;
 
 
-
+import java.util.*;
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.event.ActionEvent;
 import java.beans.PropertyVetoException;
 import java.beans.VetoableChangeListener;
-import java.util.ArrayList;
-import java.util.List;
 import java.awt.event.ActionListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.Collections;
 
 /**
  * Controller responsibilities:
@@ -26,6 +25,8 @@ import java.util.Collections;
  * </ul>
  */
 public class GameController implements ActionListener, PropertyChangeListener, VetoableChangeListener {
+    private final Map<Integer, List<LeaderboardEntry>> leaderboard = new HashMap<>();
+    private final String playerName;
     private BoardView boardView;
     private int matchedPairs = 0;
     private int totalFlips = 0;
@@ -34,18 +35,69 @@ public class GameController implements ActionListener, PropertyChangeListener, V
     private boolean bypassVeto = false;
 
     // Empty Constructor
-    public GameController() {}
+    public GameController(String playerName) {
+        this.playerName = playerName;
+    }
 
-/**
- * Handles vetoable changes to card state.
- *
- * <p>This method is triggered when a card's state property is about to change.
- * It checks if the transition from EXCLUDED or FACE_UP to FACE_DOWN is attempted,
- * and vetoes such state changes by throwing a {@link PropertyVetoException}.
- *
- * @param evt the vetoable change event containing the details of the state change
- * @throws PropertyVetoException if the state change is not allowed
- */
+    /**
+     * Updates the leaderboard for a given board size with the current player's score.
+     *
+     * <p>This method adds the current player's score to the leaderboard for the given board size,
+     * then sorts the leaderboard entries by the number of flips.
+     *
+     * @param boardSize the size of the board for which to update the leaderboard
+     */
+    public void updateLeaderboard(int boardSize) {
+        List<LeaderboardEntry> entries = leaderboard.computeIfAbsent(boardSize, k -> new ArrayList<>());
+
+        // Add the current player's score
+        entries.add(new LeaderboardEntry(playerName, totalFlips));
+
+        // Sort by flips
+        entries.sort(Comparator.comparingInt(LeaderboardEntry::getFlips));
+    }
+
+    /**
+     * Retrieves the leaderboard entries for a specified board size.
+     *
+     * <p>This method returns a list of {@link LeaderboardEntry} objects
+     * corresponding to the given board size. If no leaderboard entries
+     * exist for the specified size, an empty list is returned.
+     *
+     * @param boardSize the size of the board for which to retrieve leaderboard entries
+     * @return a list of leaderboard entries for the specified board size
+     */
+    public List<LeaderboardEntry> getLeaderboardForSize(int boardSize) {
+        return leaderboard.getOrDefault(boardSize, Collections.emptyList());
+    }
+
+    /**
+     * Sets the total number of flips in the game.
+     *
+     * @param totalFlips the total number of flips to set
+     */
+    public void setTotalFlips(int totalFlips) {
+        this.totalFlips = totalFlips;
+    }
+
+    /**
+     * Returns the total number of flips in the game.
+     *
+     */
+    public int getTotalFlips() {
+        return totalFlips;
+    }
+
+    /**
+     * Handles vetoable changes to card state.
+     *
+     * <p>This method is triggered when a card's state property is about to change.
+     * It checks if the transition from EXCLUDED or FACE_UP to FACE_DOWN is attempted,
+     * and vetoes such state changes by throwing a {@link PropertyVetoException}.
+     *
+     * @param evt the vetoable change event containing the details of the state change
+     * @throws PropertyVetoException if the state change is not allowed
+     */
     @Override
     public void vetoableChange(PropertyChangeEvent evt) throws PropertyVetoException {
         if ( "state".equals(( evt.getPropertyName()))) {
@@ -196,9 +248,7 @@ public class GameController implements ActionListener, PropertyChangeListener, V
                 firstSelectedCard = null;
 
                 // Check for game completion
-                if (matchedPairs == boardView.getCards().size() / 2) {
-                    JOptionPane.showMessageDialog(boardView, "Congratulations! You've matched all pairs.");
-                }
+                checkGameCompletion();
             } else {
                 // No match, flip both cards back after a short delay
                 isTimerActive = true; // Timer starts, disable further interactions
@@ -309,4 +359,26 @@ public class GameController implements ActionListener, PropertyChangeListener, V
         Collections.shuffle(values);
         return values;
     }
+
+    /**
+     * Returns the name of the player currently playing the game.
+     *
+     * @return the player's name
+     */
+    public String getPlayerName() {
+        return playerName;
+    }
+
+    /**
+     * Checks whether the game is complete by comparing the number of matched pairs
+     * to the total number of pairs in the game. If the game is complete, it displays
+     * a congratulatory message box to the user and updates the leaderboard.
+     */
+    private void checkGameCompletion() {
+        if (matchedPairs == boardView.getCards().size() / 2) {
+            JOptionPane.showMessageDialog(boardView, "Congratulations, " + playerName + "! You solved the game in " + totalFlips + " flips.");
+            updateLeaderboard(boardView.getCards().size() / 2); // Update the leaderboard
+        }
+    }
+
 }

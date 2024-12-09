@@ -15,8 +15,10 @@ import java.util.ArrayList;
  * control buttons (like shuffle and exit) and info labels (like matched pairs and total flips)
  */
 public class BoardView extends JFrame {
+
     private  PropertyChangeSupport pcs;
     private  List<CardView> cards = new ArrayList<>();
+    private final JButton bestScoreButton = new JButton("Leaderboard");
     private final JLabel pairsLabel = new JLabel("Number of Pairs: 4");
     private final JButton changePairsButton = new JButton("Change Pairs");
     private int numberOfPairs = 4; // Default number of pairs
@@ -41,7 +43,7 @@ public class BoardView extends JFrame {
      * Finally, sets the window visible
      */
     public BoardView(GameController controller){
-        super("Matching Pair Game");
+        super("Matching Pair Game: " + controller.getPlayerName());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLayout(new BorderLayout());
@@ -50,8 +52,12 @@ public class BoardView extends JFrame {
 
         initializeBoard(controller);
 
+        bestScoreButton.addActionListener(e -> {
+            showBestScores(controller);
+        });
         // Initialize control buttons
         JPanel controlPanel = new JPanel();
+        controlPanel.add(bestScoreButton);
         controlPanel.add(changePairsButton);
         controlPanel.add(shuffleButton);
         controlPanel.add(exitButton);
@@ -278,15 +284,70 @@ public class BoardView extends JFrame {
         getPropertyChangeSupport().firePropertyChange("shuffle", false, true);
     }
 
-/**
- * Attaches an action listener to the shuffle button that fires a shuffle event.
- *
- * <p>This method ensures that whenever the shuffle button is clicked,
- * a property change event with the name "shuffle" is fired, which can
- * trigger a shuffle action in the game.
- */
+    /**
+     * Attaches an action listener to the shuffle button that fires a shuffle event.
+     *
+     * <p>This method ensures that whenever the shuffle button is clicked,
+     * a property change event with the name "shuffle" is fired, which can
+     * trigger a shuffle action in the game.
+     */
     private void changeNumberOfPairs() {
         shuffleButton.addActionListener(e -> fireShuffleEvent());
+    }
+
+    /**
+     * Displays the best scores for a specified board size.
+     *
+     * <p>This method prompts the user to enter a board size and retrieves
+     * the leaderboard entries for that size from the provided GameController.
+     * If no entries are found, a dialog is shown indicating that no games
+     * exist for the specified size. Otherwise, a leaderboard is displayed
+     * with the player names and their corresponding scores.
+     *
+     * <p>If the user enters an invalid board size, an error dialog is displayed.
+     *
+     * @param controller the game controller used to access leaderboard data
+     */
+    private void showBestScores(GameController controller) {
+        String input = JOptionPane.showInputDialog(
+                null,
+                "Enter the board size to view the leaderboard:",
+                "Leaderboard Search",
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        try {
+            int boardSize = Integer.parseInt(input.trim());
+            List<LeaderboardEntry> entries = controller.getLeaderboardForSize(boardSize);
+
+            if (entries.isEmpty()) {
+                JOptionPane.showMessageDialog(
+                        null,
+                        "No games found for board size " + boardSize,
+                        "No Results",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+            } else {
+                StringBuilder sb = new StringBuilder("Leaderboard for " + boardSize + " pairs:\n");
+                for (LeaderboardEntry entry : entries) {
+                    sb.append(entry).append("\n");
+                }
+
+                JOptionPane.showMessageDialog(
+                        null,
+                        sb.toString(),
+                        "Leaderboard",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Invalid board size entered!",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 
 }

@@ -80,7 +80,6 @@ public class CardView extends JButton {
             this.state = newState;
             updateAppearance();
             getPropertyChangeSupport().firePropertyChange("state", oldState, newState);
-            System.out.println("Card" + this + " state changing to: " + newState);
         } catch (PropertyVetoException e) {
             System.out.println("State change vetoed: " + e.getMessage());
         }
