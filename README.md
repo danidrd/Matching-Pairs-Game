@@ -1,77 +1,84 @@
-# AP-24 – Programming Assignment #1
-
-**Date:** November 25, 2024
-
-## Assignment Overview
-
-This programming assignment consists of two exercises on Java Beans and Java Reflection and Annotations, respectively.
-
----
-
-## Exercise 1 (Java Beans) – The Matching Pairs Game
-
-The **Matching Pair game** (aka *Concentration*) is a game where some cards are laid face down on a surface and two cards are flipped face up over each turn. The goal of the game is to turn over pairs of matching cards. When a matching pair is found, it is eliminated from the game, and when all cards are eliminated, the game terminates. More information about the game can be found [here](https://en.wikipedia.org/wiki/Concentration_(card_game)).
-
-### Goal of the Assignment
-The objective is to implement a board that allows one player to play the game. Optionally, support for more players can be provided. The board and the other components of the game must be realized as Java beans, and they have to interact among themselves according to the **Publish-Subscribe** (or **Observer**) design pattern, using events and event listeners as much as possible.
-
-### Functional Requirements
-
-- **Game Start:**  
-  The game starts showing the `Board` (a bean which extends `JFrame`), on which eight `Card`s are displayed face down, together with a **Shuffle** and an **Exit** button, a **Controller** label, and a **Counter** label.
-
-- **Card Properties:**  
-  Each `Card` is a bean extending `JButton` and has:
-    - A property `value`.
-    - A property `state`, which is both **bound** and **constrained**. The state can have three possible values:
-        - `excluded` (the card is removed from the game).
-        - `face_down` (the card's value is hidden, shown as green).
-        - `face_up` (the card's value is visible).
-
-- **Game Logic:**
-    - At the beginning of the game and whenever the **Shuffle** button is clicked, the `Board` initializes the `Card` values using a random sequence of length 8, made of 4 identical pairs.
-    - The `Board` fires a **shuffle** event, wrapping the new sequence of values. Each `Card` must register as a listener to this event to update its value.
-    - Clicking a `Card` changes its `state`:
-        - From `face_down` to `face_up`.
-        - From `excluded` or `face_up` to `face_down` (vetoed by the `Controller`).
-
-- **Controller Logic:**
-    - The **Controller** label tracks the number of matched pairs (`0` initially).
-    - When a first card is flipped `face_up`, its value `v1` is stored.  
-      When a second card is flipped `face_up`, its value `v2` is stored:
-        - If `v1 == v2`:
-            - The `Controller` fires a **matched** event with `true`.
-            - Both cards are marked as `excluded`, and the counter is incremented.
-        - If `v1 != v2`:
-            - The `Controller` fires a **matched** event with `false`.
-            - The second card remains visible for 1 second before returning to `face_down`.
-
-- **Counter:**  
-  Displays the total number of times a card has been turned `face_up`. Resets to `0` when the **shuffle** event is fired.
-
-- **Exit Button:**  
-  Prompts the user for confirmation. If confirmed, the game ends; otherwise, nothing happens.
-
-### Additional Details
-- At startup, the `Board` creates all beans and registers them as listeners to events.
-- All beans must use the **Observer Design Pattern** for interactions.
-- After all cards become `excluded`, no more state changes are possible, and only the **Shuffle** and **Exit** buttons remain active.
+# Matching Pairs Game
+First exercise of the assignment of Advanced Programming (MSc in Computer Science and Networking at UniPisa)
+    
+    https://pages.di.unipi.it/corradini/Didattica/AP-24/PROG-ASS/01/2024-Assignment-1-v1.pdf
+## Overview
+The Matching Pairs game is a turn-based card-matching game implemented in Java. This implementation focuses on modularity, scalability, and maintainability by following the **Model-View-Controller (MVC)** architecture, ensuring a clean separation of responsibilities. The project also adheres to **high decoupling** and the **Observer pattern**, enabling robust communication between components.
 
 ---
 
-## Optional Extensions
+## Features
 
-1. **Parametric Card Count:**
-    - Define a constant `N` in the `Board` (default is `4`) and use `2 x N` as the number of cards.
-    - Modifying `N` requires recompiling only the `Board` to adapt the game.
+### Single-Player Mode
+- Play a classic matching pairs game with a dynamic board size.
+- Track your total flips and matched pairs during gameplay.
 
-2. **Challenge Label:**
-    - Add a `Challenge` label to display the best score since the start of the game.
-    - The score is defined as the smallest number of moves needed to complete a round.
+### Multiplayer Mode
+- Supports up to 4 players with a turn-based system.
+- Each player has individual scores (`matchedPairs` and `totalFlips`).
+- The current player’s progress is dynamically displayed in the UI.
+- The global game state ensures consistency among all players.
+
+### Leaderboard
+- Tracks the best scores across different board sizes.
+- Players can view rankings for specific configurations and compete for the top spot.
+
+### Dynamic Board Resizing
+- Change the number of pairs dynamically during the game.
+- A button allows manual input of the new board size, which adjusts the layout and updates the game state seamlessly.
 
 ---
 
-## Solution Format
+## Design Principles
 
-- Submit suitably commented source files for all beans.
-- Provide one `.jar` archive for each bean.
+### Model-View-Controller (MVC) Architecture
+- **Model**: `GameController` manages game logic, such as player turns, scoring, and the overall game state.
+- **View**: `BoardView` and `CardView` handle user interface elements, displaying the game board and cards.
+- **Controller**: Bridges the user input, game logic, and view, ensuring synchronization.
+
+This architecture ensures modularity, making it easy to adapt or extend the game logic or UI independently.
+
+### High Decoupling
+- Instead of having each `CardView` directly respond to the `shuffle` event, the `GameController` centrally manages this logic.
+- The `GameController` listens to the `BoardView`'s `shuffle` event and updates the `CardView` instances.
+- This design reduces direct dependencies between components, enhancing maintainability and scalability.
+
+### Observer Pattern
+The implementation makes extensive use of the Observer pattern:
+- The `BoardView` emits a `shuffle` event, which is handled by the `GameController` to update all `CardView` instances.
+- Each `CardView` observes changes to its `state` property:
+    - The `state` is **vetoable**, ensuring valid state transitions, and **bound**, notifying the `GameController` when flips occur.
+    - The `GameController` processes the `state` event and invokes the `handleCardFlip` method to manage the game logic.
+- Button actions are also handled centrally by the `GameController`, maintaining consistency and proper sequencing of events.
+
+---
+
+## How It Works
+
+1. **Game Initialization**:
+    - Players are prompted to choose single-player or multiplayer mode and specify the number of players.
+    - Players then enter their usernames.
+
+2. **Gameplay**:
+    - Players take turns flipping cards to find matching pairs.
+    - If a match is found, the player continues; otherwise, the next player takes their turn.
+
+3. **Game End**:
+    - The game ends when all pairs are matched.
+    - The player with the most matches (and fewest flips in case of a tie) is declared the winner.
+    - A detailed ranking of all players is displayed.
+
+4. **Leaderboard**:
+    - At the end of a game, scores are stored in a leaderboard that can be viewed based on the board size.
+
+---
+
+## How to Run
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/<your-username>/matching-pairs-game.git
+
+2. Use Maven from an IDE(e.g. IntelliJ, Apache NetBeans) for install and packaging the project.
+
+
+Otherwise, .jar files will be uploaded soon.
