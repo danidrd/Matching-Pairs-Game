@@ -80,5 +80,12 @@ The implementation makes extensive use of the Observer pattern:
 
 2. Use Maven from an IDE(e.g. IntelliJ, Apache NetBeans) for install and packaging the project.
 
+---
+## Run with .jar file
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/danidrd/matching-pairs-game.git
 
-Otherwise, .jar files will be uploaded soon.
+2. Run the .jar file inside the out/ folder;
+   ```bash
+   java -jar matching-pairs-game.jar
