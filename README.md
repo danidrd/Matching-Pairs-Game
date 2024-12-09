@@ -76,7 +76,7 @@ The implementation makes extensive use of the Observer pattern:
 ## How to Run
 1. Clone the repository:
    ```bash
-   git clone https://github.com/<your-username>/matching-pairs-game.git
+   git clone https://github.com/danidrd/matching-pairs-game.git
 
 2. Use Maven from an IDE(e.g. IntelliJ, Apache NetBeans) for install and packaging the project.
 
