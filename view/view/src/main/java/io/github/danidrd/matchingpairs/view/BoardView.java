@@ -43,7 +43,7 @@ public class BoardView extends JFrame {
      * Finally, sets the window visible
      */
     public BoardView(GameController controller){
-        super("Matching Pair Game: " + controller.getPlayerName());
+        super("Matching Pair Game: " + controller.getCurrentPlayer().getName());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLayout(new BorderLayout());
@@ -99,7 +99,7 @@ public class BoardView extends JFrame {
                 10,
                 10
         ));
-
+        controller.setCurrentPlayerIndex(0);
         this.changeNumberOfPairs();
         // Create and add cards
         initializeCards(controller, controller, numberOfPairs * 2, cardsPanel);
@@ -138,8 +138,8 @@ public class BoardView extends JFrame {
                     numberOfPairs = newPairs;
 
                     // Reset labels
-                    matchedPairsLabel.setText("Matched Pairs: 0");
-                    totalFlipsLabel.setText("Total Flips: 0");
+                    controller.setCurrentPlayerIndex(0);
+                    updateUI(controller);
 
 
                     // Update board
@@ -349,5 +349,22 @@ public class BoardView extends JFrame {
             );
         }
     }
+
+    /**
+     * Updates the UI components with the current game state.
+     *
+     * <p>This method updates the title of the board view with the current
+     * player's name, and updates the text of the total flips and matched
+     * pairs labels with the current player's total flips and matched pairs
+     * values.
+     *
+     * @param controller the game controller used to access the current player's state
+     */
+    public void updateUI(GameController controller) {
+        setTitle("Matching Game Pairs: " + controller.getCurrentPlayer().getName());
+        totalFlipsLabel.setText("Total Flips_" + controller.getCurrentPlayer().getName() + " :" + controller.getCurrentPlayer().getTotalFlips());
+        matchedPairsLabel.setText("Matched Pairs_" + controller.getCurrentPlayer().getName() + " :" + controller.getCurrentPlayer().getMatchedPairs());
+    }
+
 
 }

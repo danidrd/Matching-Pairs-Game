@@ -10,13 +10,6 @@ public class LeaderboardEntry {
     }
 
     /**
-     * @return the player's name
-     */
-    public String getPlayerName() {
-        return playerName;
-    }
-
-    /**
      * @return the number of flips required to complete the game
      */
     public int getFlips() {
@@ -25,7 +18,7 @@ public class LeaderboardEntry {
 
     /**
      * @return a string representation of the leaderboard entry in the format
-     *         'playerName: flips flips'
+     *         'playerName: flips '
      */
     @Override
     public String toString() {

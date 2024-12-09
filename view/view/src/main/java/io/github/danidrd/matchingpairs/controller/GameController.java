@@ -4,6 +4,7 @@ import io.github.danidrd.matchingpairs.view.BoardView;
 import io.github.danidrd.matchingpairs.view.CardView;
 import io.github.danidrd.matchingpairs.view.CardState;
 import io.github.danidrd.matchingpairs.view.LeaderboardEntry;
+import io.github.danidrd.matchingpairs.view.Player;
 
 
 import java.util.*;
@@ -26,18 +27,23 @@ import java.beans.PropertyChangeListener;
  */
 public class GameController implements ActionListener, PropertyChangeListener, VetoableChangeListener {
     private final Map<Integer, List<LeaderboardEntry>> leaderboard = new HashMap<>();
-    private final String playerName;
+    private final List<Player> players = new ArrayList<>();
+    private int currentPlayerIndex = 0;
+    private int globalMatchedPairs = 0;
     private BoardView boardView;
-    private int matchedPairs = 0;
     private int totalFlips = 0;
     private CardView firstSelectedCard = null;
     private boolean isTimerActive = false; // Flag to track timer activity
     private boolean bypassVeto = false;
 
     // Empty Constructor
-    public GameController(String playerName) {
-        this.playerName = playerName;
+    public GameController(List<String> playerNames) {
+        for (String name : playerNames) {
+            players.add(new Player(name));
+        }
     }
+
+
 
     /**
      * Updates the leaderboard for a given board size with the current player's score.
@@ -47,11 +53,11 @@ public class GameController implements ActionListener, PropertyChangeListener, V
      *
      * @param boardSize the size of the board for which to update the leaderboard
      */
-    public void updateLeaderboard(int boardSize) {
+    public void updateLeaderboard(int boardSize, String winner) {
         List<LeaderboardEntry> entries = leaderboard.computeIfAbsent(boardSize, k -> new ArrayList<>());
 
         // Add the current player's score
-        entries.add(new LeaderboardEntry(playerName, totalFlips));
+        entries.add(new LeaderboardEntry(winner, totalFlips));
 
         // Sort by flips
         entries.sort(Comparator.comparingInt(LeaderboardEntry::getFlips));
@@ -71,22 +77,7 @@ public class GameController implements ActionListener, PropertyChangeListener, V
         return leaderboard.getOrDefault(boardSize, Collections.emptyList());
     }
 
-    /**
-     * Sets the total number of flips in the game.
-     *
-     * @param totalFlips the total number of flips to set
-     */
-    public void setTotalFlips(int totalFlips) {
-        this.totalFlips = totalFlips;
-    }
 
-    /**
-     * Returns the total number of flips in the game.
-     *
-     */
-    public int getTotalFlips() {
-        return totalFlips;
-    }
 
     /**
      * Handles vetoable changes to card state.
@@ -104,7 +95,6 @@ public class GameController implements ActionListener, PropertyChangeListener, V
             if(isBypassVeto()) {
                 return; // Skip veto logic during shuffle or other bypass operations
             }
-            CardView card = (CardView) evt.getSource();
             CardState oldState = (CardState) evt.getOldValue();
             CardState newState = (CardState) evt.getNewValue();
 
@@ -196,8 +186,6 @@ public class GameController implements ActionListener, PropertyChangeListener, V
                 handleCardFlip(card);
             }
         } else if("shuffle".equals(evt.getPropertyName())) {
-            matchedPairs = 0;
-            totalFlips = 0;
             shuffleCards();
         }
     }
@@ -220,13 +208,17 @@ public class GameController implements ActionListener, PropertyChangeListener, V
      * @param card the card that was flipped
      */
     private void handleCardFlip(CardView card) {
+        Player currentPlayer = getCurrentPlayer();
+
         // Ignore clicks if the timer is active or the card is not in a flippable state
         if (isTimerActive || card.getState() != CardState.FACE_UP) {
             return;
         }
 
+        currentPlayer.incrementTotalFlips();
+
         totalFlips++;
-        boardView.getTotalFlipsLabel().setText("Total Flips: " + totalFlips);
+        boardView.getTotalFlipsLabel().setText("Total Flips_" + currentPlayer.getName() +": " + currentPlayer.getTotalFlips());
 
         // Flip the card to FACE_UP
         card.setState(CardState.FACE_UP);
@@ -238,11 +230,15 @@ public class GameController implements ActionListener, PropertyChangeListener, V
             // Compare with the first selected card
             if (firstSelectedCard.getValue() == card.getValue()) {
                 // Matched pair
-                matchedPairs++;
-                boardView.getMatchedPairsLabel().setText("Matched Pairs: " + matchedPairs);
+                incrementGlobalMatchedPairs();
+                currentPlayer.incrementMatchedPairs();
+                boardView.getMatchedPairsLabel().setText("Matched Pairs_" + currentPlayer.getName() + ": " + currentPlayer.getMatchedPairs());
 
                 firstSelectedCard.setState(CardState.EXCLUDED);
                 card.setState(CardState.EXCLUDED);
+
+                // Verify consistency with multi-player
+                verifyMatchingPairsConsistency();
 
                 // Clear the selection
                 firstSelectedCard = null;
@@ -252,21 +248,40 @@ public class GameController implements ActionListener, PropertyChangeListener, V
             } else {
                 // No match, flip both cards back after a short delay
                 isTimerActive = true; // Timer starts, disable further interactions
-                Timer timer = new Timer(1000, evt -> {
-                    setBypassVeto(true);
-                    firstSelectedCard.setState(CardState.FACE_DOWN);
-                    card.setState(CardState.FACE_DOWN);
-                    setBypassVeto(false);
-
-                    // Clear the selection
-                    firstSelectedCard = null;
-
-                    isTimerActive = false; // Timer ends, re-enable interactions
-                });
-                timer.setRepeats(false);
+                Timer timer = getTimer(card);
                 timer.start();
             }
         }
+    }
+
+    /**
+     * Creates a timer that, when triggered, will flip the given card and the
+     * first selected card back to FACE_DOWN, clear the selection, switch to
+     * the next player, and re-enable interactions.
+     *
+     * <p>
+     * The timer is set to trigger after a 1 second delay. It is used to delay
+     * the flipping back of unmatched cards.
+     *
+     * @param card the card to flip back
+     * @return a timer that will flip the card back and reset the state
+     */
+    private Timer getTimer(CardView card) {
+        Timer timer = new Timer(1000, evt -> {
+            setBypassVeto(true);
+            firstSelectedCard.setState(CardState.FACE_DOWN);
+            card.setState(CardState.FACE_DOWN);
+            setBypassVeto(false);
+
+            // Clear the selection
+            firstSelectedCard = null;
+            nextPlayer();
+            boardView.updateUI(this);
+            isTimerActive = false; // Timer ends, re-enable interactions
+
+        });
+        timer.setRepeats(false);
+        return timer;
     }
 
 
@@ -277,10 +292,17 @@ public class GameController implements ActionListener, PropertyChangeListener, V
      * state to FACE_DOWN.
      */
     private void shuffleCards() {
-        matchedPairs = 0;
+        globalMatchedPairs = 0;
         totalFlips = 0;
-        boardView.getMatchedPairsLabel().setText("Matched Pairs: " + matchedPairs);
-        boardView.getTotalFlipsLabel().setText("Total Flips: " + totalFlips);
+        for( Player player : players) {
+            player.resetMatchedPairs();
+        }
+        setCurrentPlayerIndex(0);
+        boardView.setTitle("Matching Pairs Game:" + getCurrentPlayer().getName());
+
+        verifyMatchingPairsConsistency();
+        boardView.getMatchedPairsLabel().setText("Matched Pairs_" + getCurrentPlayer().getName() + ": " + getCurrentPlayer().getMatchedPairs());
+        boardView.getTotalFlipsLabel().setText("Total Flips_" + getCurrentPlayer().getName() + ": " + getCurrentPlayer().getTotalFlips());
 
         // Assign pairs
         int numberOfPairs = boardView.getCards().size() / 2;
@@ -289,6 +311,7 @@ public class GameController implements ActionListener, PropertyChangeListener, V
 
         // Temporarily bypass veto logic
         setBypassVeto(true);
+
 
         // Assign shuffled values to cards and reset state
         for( int i = 0; i < numberOfPairs * 2; i++ ) {
@@ -338,17 +361,17 @@ public class GameController implements ActionListener, PropertyChangeListener, V
         this.bypassVeto = bypassVeto;
     }
 
-/**
- * Generates a shuffled list of card values for the game.
- *
- * <p>This method creates a list containing pairs of integers from 1
- * to the specified number of pairs, shuffles the list to randomize
- * the order, and returns it. Each integer appears twice in the list,
- * representing a pair of matching card values.
- *
- * @param pairs the number of unique pairs of card values to generate
- * @return a shuffled list of card values with each value appearing twice
- */
+    /**
+     * Generates a shuffled list of card values for the game.
+     *
+     * <p>This method creates a list containing pairs of integers from 1
+     * to the specified number of pairs, shuffles the list to randomize
+     * the order, and returns it. Each integer appears twice in the list,
+     * representing a pair of matching card values.
+     *
+     * @param pairs the number of unique pairs of card values to generate
+     * @return a shuffled list of card values with each value appearing twice
+     */
     private List<Integer> generateCardValues(int pairs){
         List<Integer> values = new ArrayList<>();
         for(int i = 1; i <= pairs; i++){
@@ -360,13 +383,57 @@ public class GameController implements ActionListener, PropertyChangeListener, V
         return values;
     }
 
+
     /**
-     * Returns the name of the player currently playing the game.
+     * Returns the player that is currently playing.
      *
-     * @return the player's name
+     * @return the player that is currently playing
      */
-    public String getPlayerName() {
-        return playerName;
+    public Player getCurrentPlayer() {
+        return players.get(currentPlayerIndex);
+    }
+
+    /**
+     * Moves the game to the next player in the list.
+     *
+     * <p>This method cycles the current player index to the next player
+     * in the list, using modulo arithmetic to wrap around to the start
+     * of the list if the end is reached.
+     */
+    public void nextPlayer() {
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
+    }
+
+    /**
+     * Returns the total number of matched pairs across all players.
+     *
+     * <p>This value is incremented whenever a player matches a pair of cards.
+     *
+     * @return the total number of matched pairs across all players
+     */
+    public int getGlobalMatchedPairs() {
+        return globalMatchedPairs;
+    }
+
+    /**
+     * Increments the total number of matched pairs across all players.
+     *
+     * <p>This value is incremented whenever a player matches a pair of cards.
+     */
+    public void incrementGlobalMatchedPairs() {
+        globalMatchedPairs++;
+    }
+
+    /**
+     * Returns the list of players in the game.
+     *
+     * <p>This list includes all the players that are currently playing
+     * in the game, and is used to track their individual scores.
+     *
+     * @return the list of players in the game
+     */
+    public List<Player> getPlayers() {
+        return players;
     }
 
     /**
@@ -375,10 +442,106 @@ public class GameController implements ActionListener, PropertyChangeListener, V
      * a congratulatory message box to the user and updates the leaderboard.
      */
     private void checkGameCompletion() {
-        if (matchedPairs == boardView.getCards().size() / 2) {
-            JOptionPane.showMessageDialog(boardView, "Congratulations, " + playerName + "! You solved the game in " + totalFlips + " flips.");
-            updateLeaderboard(boardView.getCards().size() / 2); // Update the leaderboard
+        if (globalMatchedPairs == boardView.getCards().size() / 2) {
+            endGame();
         }
+    }
+
+    /**
+     * Verifies that the sum of the matched pairs of all players is equal to the total global matched pairs.
+     *
+     * <p>This method is used to ensure that the state of the game is consistent. If the sum of the matched
+     * pairs of all players is not equal to the total global matched pairs, an {@link IllegalStateException}
+     * is thrown.
+     */
+    private void verifyMatchingPairsConsistency() {
+        int totalMatchedPairs = getPlayers().stream()
+                .mapToInt(Player::getMatchedPairs)
+                .sum();
+
+        if ( totalMatchedPairs != getGlobalMatchedPairs()) {
+            throw new IllegalStateException("Mismatch between global and individual matched pairs!");
+        }
+    }
+
+
+/**
+ * Ends the current game session by determining the winner, displaying a congratulatory message,
+ * showing player rankings, and updating the leaderboard.
+ *
+ * <p>This method verifies the consistency of matched pairs, determines the winner based on the
+ * number of matched pairs and total flips, and displays a message announcing the winner. It then
+ * generates and displays the player rankings and updates the leaderboard with the winner's score
+ * for the current board size.
+ */
+    private void endGame() {
+
+        verifyMatchingPairsConsistency();
+
+        Player winner = getPlayers().stream()
+                .max(Comparator.comparingInt(Player::getMatchedPairs)
+                        .thenComparingInt(Player::getTotalFlips))
+                .orElseThrow();
+
+        JOptionPane.showMessageDialog(
+                boardView,
+                "Game Over! The winner is " + winner.getName() +
+                        " with " + winner.getMatchedPairs() + " matches and " +
+                        winner.getTotalFlips() + " flips.",
+                "Winner Announcement",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+
+        // Generate and show player rankings
+        showPlayerRankings();
+
+        updateLeaderboard(boardView.getCards().size() / 2, winner.getName());
+    }
+
+    /**
+     * Sets the index of the current player in the list of players.
+     *
+     * <p>This method is used to move the game to the next player in the list,
+     * or to restart the game with the first player.
+     *
+     * @param currentPlayerIndex the index of the current player in the list
+     *                            of players
+     */
+    public void setCurrentPlayerIndex(int currentPlayerIndex) {
+        this.currentPlayerIndex = currentPlayerIndex;
+    }
+
+    /**
+     * Shows the player rankings at the end of the game.
+     *
+     * <p>This method sorts the players by the number of matched pairs (in descending order)
+     * and the total number of flips (in ascending order). The rankings are then displayed
+     * in a message box.
+     */
+    private void showPlayerRankings() {
+        // Sort players by matched pairs (descending) and total flips (ascending)
+        List<Player> sortedPlayers = players.stream()
+                .sorted(Comparator.comparingInt(Player::getMatchedPairs).reversed()
+                        .thenComparingInt(Player::getTotalFlips))
+                .toList();
+
+        // Build the ranking string
+        StringBuilder rankings = new StringBuilder("Player Rankings:\n");
+        int rank = 1;
+        for (Player player : sortedPlayers) {
+            rankings.append(rank++).append(". ")
+                    .append(player.getName())
+                    .append(": ").append(player.getMatchedPairs()).append(" matched pairs, ")
+                    .append(player.getTotalFlips()).append(" flips\n");
+        }
+
+        // Show the rankings in a dialog
+        JOptionPane.showMessageDialog(
+                boardView,
+                rankings.toString(),
+                "Player Rankings",
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
 }

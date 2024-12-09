@@ -1,6 +1,5 @@
 package io.github.danidrd.matchingpairs.view;
 
-import io.github.danidrd.matchingpairs.controller.GameController;
 
 import javax.swing.*;
 import java.awt.*;
