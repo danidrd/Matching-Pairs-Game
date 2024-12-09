@@ -317,6 +317,7 @@ public class BoardView extends JFrame {
         );
 
         try {
+            if( input == null) return;
             int boardSize = Integer.parseInt(input.trim());
             List<LeaderboardEntry> entries = controller.getLeaderboardForSize(boardSize);
 
