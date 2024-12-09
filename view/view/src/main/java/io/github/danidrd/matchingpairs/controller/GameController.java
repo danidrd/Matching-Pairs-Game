@@ -292,6 +292,10 @@ public class GameController implements ActionListener, PropertyChangeListener, V
      * state to FACE_DOWN.
      */
     private void shuffleCards() {
+        if (isTimerActive()) {
+            JOptionPane.showMessageDialog(boardView, "Cannot shuffle while timer is active", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         globalMatchedPairs = 0;
         totalFlips = 0;
         for( Player player : players) {
